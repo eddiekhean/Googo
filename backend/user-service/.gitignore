@@ -1,0 +1,80 @@
+# =========================
+# Build & dependency outputs
+# =========================
+/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# =========================
+# IDE / Editor files
+# =========================
+# IntelliJ
+.idea/
+*.iml
+out/
+
+
+# =========================
+# Logs / Temp / Cache
+# =========================
+*.log
+logs/
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+.DS_Store
+
+# =========================
+# Environment & Config
+# =========================
+.env
+*.local.yaml
+application-local.yaml
+application-dev.yaml
+application-test.yaml
+config/*.local.yaml
+config/*.dev.yaml
+
+# =========================
+# Docker
+# =========================
+/docker-compose.override.yml
+/.docker/
+*.pid
+
+# =========================
+# OS / Misc
+# =========================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =========================
+# JetBrains cache / data
+# =========================
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
+# =========================
+# Node (if front-end exists in repo)
+# =========================
+node_modules/
+dist/
+build/
+
+# =========================
+# Secrets
+# =========================
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+secrets/
