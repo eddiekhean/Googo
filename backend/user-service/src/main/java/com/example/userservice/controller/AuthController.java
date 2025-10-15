@@ -82,6 +82,14 @@ public class AuthController {
      * - If valid → activate user (status = ACTIVE)
      * - Delete OTP from Redis
      */
+    @PostMapping("/sendOTP")
+    ResponseEntity<?> sendOtp() {
+        // TODO: send email OTP
+        // - Gen OTP by util class
+        // - cache OTP in redis
+        // - Send email OTP in order service
+        return ResponseEntity.ok().build();
+    }
     @PostMapping("/verify-email")
     ResponseEntity<?> verifyEmail() {
         // TODO: verify email by OTP
