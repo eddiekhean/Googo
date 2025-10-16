@@ -2,6 +2,7 @@ package com.example.userservice.exception;
 
 
 import com.example.userservice.dto.ErrorResponse;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -87,5 +88,40 @@ public class GlobalExceptionHandler {
         log.error("Unexpected error", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(buildError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", e.getMessage(), request.getRequestURI()));
+    }
+    // Token hết hạn
+    @ExceptionHandler(ExpiredJwtException.class)
+    public ResponseEntity<ErrorResponse> handleExpiredJwt(ExpiredJwtException e,
+                                                          HttpServletRequest request) {
+        log.warn("Token expired at {} - request {}", e.getClaims().getExpiration(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(buildError(
+                        HttpStatus.UNAUTHORIZED,
+                        "Unauthorized",
+                        "Access token has expired",
+                        request.getRequestURI()
+                ));
+    }
+    @ExceptionHandler(OtpExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleOtpExpired(OtpExpiredException e,
+                                                          HttpServletRequest request) {
+        log.warn("OTP expired: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError(
+                        HttpStatus.BAD_REQUEST,
+                        "OTP Expired",
+                        e.getMessage(),
+                        request.getRequestURI()
+                ));
+    }
+    @ExceptionHandler(InvalidOtpException.class)
+    public ResponseEntity<ErrorResponse> handlerInvalidOtp(InvalidOtpException e,
+                                                           HttpServletRequest request) {
+        log.warn("Invalid OTP: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError(HttpStatus.BAD_REQUEST,
+                        "Invalid OTP",
+                        e.getMessage(),
+                        request.getRequestURI()));
     }
 }

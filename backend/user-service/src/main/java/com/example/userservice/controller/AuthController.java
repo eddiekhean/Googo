@@ -1,117 +1,57 @@
 package com.example.userservice.controller;
 
+import com.example.userservice.dto.AuthResponse;
 import com.example.userservice.dto.LoginRequest;
 import com.example.userservice.dto.RegisterRequest;
-import com.example.userservice.dto.UserDetailsImpl;
 import com.example.userservice.service.AuthService;
-import com.example.userservice.util.JwtUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
 
     private final AuthService authService;
 
-    private final JwtUtil jwtUtil;
 
-    private final RedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * Register a new user account
-     * - Check for duplicate email/username
-     * - Hash the password
-     * - Save the user as INACTIVE
-     * - Generate OTP and store it in Redis (TTL = 5 minutes)
-     * - Send verification email
-     */
     @PostMapping("/register")
     ResponseEntity<?> register(@RequestBody @Valid RegisterRequest request) throws BadRequestException {
         authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("message", "User registered successfully. Please verify your email."));
     }
-
-    /**
-     * User login
-     * - Authenticate by email + password
-     * - Check if user status = ACTIVE
-     * - Generate accessToken and refreshToken
-     * - Store refreshToken in Redis (TTL = 7 days)
-     * - Return token response
-     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
-
-        UserDetailsImpl user = (UserDetailsImpl) authentication.getPrincipal();
-
-        String accessToken = jwtUtil.generateAccessToken(user);
-        String refreshToken = jwtUtil.generateRefreshToken(user);
-
-        String key = "refresh_token::" + user.getId();
-        redisTemplate.opsForValue().set(key, refreshToken, Duration.ofDays(7));
-
-        return ResponseEntity.ok(Map.of(
-                "accessToken", accessToken,
-                "refreshToken", refreshToken,
-                "expiresIn", jwtUtil.getAccessExpiration()
-        ));
+        AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * Verify email by OTP
-     * - Accept email + OTP
-     * - Check OTP in Redis
-     * - If valid → activate user (status = ACTIVE)
-     * - Delete OTP from Redis
-     */
     @PostMapping("/sendOTP")
     ResponseEntity<?> sendOtp() {
-        // TODO: send email OTP
-        // - Gen OTP by util class
-        // - cache OTP in redis
-        // - Send email OTP in order service
-        return ResponseEntity.ok().build();
+        authService.sendOtp();
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Map.of("message", "Check your email!"));
     }
     @PostMapping("/verify-email")
-    ResponseEntity<?> verifyEmail() {
-        // TODO: verify email by OTP
-        // - validate OTP from Redis
-        // - if valid: activate user
-        // - else: throw InvalidOtpException
-        return ResponseEntity.ok().build();
+    ResponseEntity<?> verifyEmail(@Valid @RequestParam String otp) {
+        authService.verifyOtp(otp);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Map.of("message", "Email đã được xác thực"));
     }
 
-    /**
-     * Refresh access token
-     * - Accept refreshToken
-     * - Validate refreshToken from Redis
-     * - Generate a new accessToken
-     * - Return the new accessToken
-     */
     @PostMapping("/refresh-token")
-    ResponseEntity<?> refreshToken() {
-        // TODO: implement refresh token logic
-        // - validate refreshToken
-        // - generate and return new accessToken
-        return ResponseEntity.ok().build();
+    ResponseEntity<?> refreshToken(String refreshToken) {
+        AuthResponse response = authService.refreshToken(refreshToken);
+        return ResponseEntity.ok(response);
     }
 
     /**

@@ -1,10 +1,16 @@
 package com.example.userservice.dto;
 
+import com.example.userservice.model.entity.User;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.List;
+
 import java.util.UUID;
+
+
 
 public class UserDetailsImpl implements UserDetails {
     private final UUID id;
@@ -17,6 +23,15 @@ public class UserDetailsImpl implements UserDetails {
         this.username = username;
         this.password = password;
         this.authorities = authorities;
+    }
+
+    public static UserDetailsImpl build(User user) {
+        return new UserDetailsImpl(
+                user.getId(),
+                user.getUsername(),
+                user.getPassword(),
+                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+        );
     }
 
     // constructor, getter...

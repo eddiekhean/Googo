@@ -2,10 +2,10 @@ package com.example.userservice.util;
 
 import com.example.userservice.dto.UserDetailsImpl;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ResourceUtils;
 
@@ -63,21 +63,33 @@ public class JwtUtil {
     }
     // --- Sinh Access Token ---
     public String generateAccessToken(UserDetailsImpl user) {
+        String role = user.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("CUSTOMER");
+
         return Jwts.builder()
                 .setSubject(user.getId().toString())
                 .claim("userName", user.getUsername())
-                .claim("role", user.getAuthorities().stream().findFirst())
+                .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + accessExpiration))
                 .signWith(privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }
 
+
     // --- Sinh Refresh Token ---
     public String generateRefreshToken(UserDetailsImpl user) {
+        String role = user.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("CUSTOMER");
+
         return Jwts.builder()
                 .setSubject(user.getId().toString())
-                .claim("role", user.getAuthorities().stream().findFirst())
+                .claim("userName", user.getUsername())
+                .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(privateKey, SignatureAlgorithm.RS256)
@@ -97,7 +109,7 @@ public class JwtUtil {
         try {
             extractClaims(token);
             return true;
-        } catch (JwtException e) {
+        } catch (Exception e) {
             return false;
         }
     }
