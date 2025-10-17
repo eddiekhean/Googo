@@ -9,32 +9,53 @@ import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.regex.Pattern;
+
 
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-
     private final AuthService authService;
-
-
-
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+    /**
+     * Register new user
+     * - Validate uniqueness (email, username)
+     * - Hash password and save user
+     * - Set default fields (role, gender, status)
+     * - Send welcome/verification email
+     */
     @PostMapping("/register")
     ResponseEntity<?> register(@RequestBody @Valid RegisterRequest request) throws BadRequestException {
         authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("message", "User registered successfully. Please verify your email."));
     }
+    /**
+     * Login
+     * - Authenticate username + password
+     * - Generate access + refresh tokens
+     * - Store refresh token in Redis (7 days)
+     * - Return AuthResponse
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
-
+    /**
+     * Verify email with OTP
+     * - Accept OTP input
+     * - Validate OTP against Redis
+     * - Delete OTP if valid
+     * - Mark user as active
+     */
     @PostMapping("/sendOTP")
     ResponseEntity<?> sendOtp() {
         authService.sendOtp();
@@ -42,29 +63,34 @@ public class AuthController {
                 .body(Map.of("message", "Check your email!"));
     }
     @PostMapping("/verify-email")
-    ResponseEntity<?> verifyEmail(@Valid @RequestParam String otp) {
+    ResponseEntity<?> verifyEmail(@Valid @RequestBody String otp) {
         authService.verifyOtp(otp);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(Map.of("message", "Email đã được xác thực"));
     }
-
+    /**
+     * Refresh access token
+     * - Accept refresh token
+     * - Verify signature & expiration
+     * - Validate against Redis
+     * - Issue new access + refresh tokens
+     * - Update Redis with new refresh token
+     */
     @PostMapping("/refresh-token")
     ResponseEntity<?> refreshToken(String refreshToken) {
         AuthResponse response = authService.refreshToken(refreshToken);
         return ResponseEntity.ok(response);
     }
-
     /**
-     * Logout user
-     * - Remove refreshToken from Redis
-     * - Optionally blacklist the accessToken
-     * - Return success message
+     * Logout
+     * - Accept refresh token from client
+     * - Invalidate access token (store in Redis blacklist until expiry)
+     * - Delete refresh token from Redis
      */
     @PostMapping("/logout")
-    ResponseEntity<?> logout(@RequestHeader("Authorization") String token) {
-        // TODO: revoke JWT tokens
-        // - remove refreshToken from Redis
-        // - optionally add accessToken to blacklist
+    ResponseEntity<?> logout(@RequestBody String refreshToken) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        authService.logout(authentication.getCredentials().toString(),refreshToken);
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 
@@ -77,11 +103,9 @@ public class AuthController {
      */
     @PostMapping("/resend-otp")
     ResponseEntity<?> resendOtp() {
-        // TODO: resend verification OTP
-        // - verify user exists and inactive
-        // - generate new OTP and store in Redis
-        // - send email
-        return ResponseEntity.ok(Map.of("message", "OTP resent successfully"));
+        authService.sendOtp();
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Map.of("message", "Check your email!"));
     }
 
     /**
@@ -92,11 +116,12 @@ public class AuthController {
      * - Send OTP email
      */
     @PostMapping("/forgot-password")
-    ResponseEntity<?> forgotPassword() {
-        // TODO: send password reset OTP
-        // - find user by email/username
-        // - generate OTP, store in Redis
-        // - send email
+    public ResponseEntity<?> forgotPassword(@RequestParam("identifier") String identifier) {
+        if (EMAIL_PATTERN.matcher(identifier).matches()) {
+            authService.forgotPasswordEmail(identifier);
+        } else {
+            authService.forgotPasswordUserName(identifier);
+        }
         return ResponseEntity.ok(Map.of("message", "Password reset OTP sent"));
     }
 
@@ -108,10 +133,8 @@ public class AuthController {
      * - Delete OTP from Redis
      */
     @PostMapping("/reset-password")
-    ResponseEntity<?> resetPassword() {
-        // TODO: reset password using OTP
-        // - validate OTP
-        // - encode and update password
+    ResponseEntity<?> resetPassword(@RequestBody String email, String newPassword,String otp) {
+        authService.resetPassword(email,otp, newPassword);
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 
@@ -122,10 +145,8 @@ public class AuthController {
      * - Encode and update new password
      */
     @PutMapping("/change-password")
-    ResponseEntity<?> changePassword() {
-        // TODO: change password flow
-        // - validate old password
-        // - encode and save new password
+    ResponseEntity<?> changePassword(@RequestBody String oldPassword,  String newPassword) {
+        authService.changePassword(oldPassword,newPassword);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 

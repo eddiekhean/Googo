@@ -7,10 +7,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Component
 public class CurrentUserProvider {
-
     public Optional<String> getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
@@ -29,7 +29,6 @@ public class CurrentUserProvider {
     }
 
     public String getStringUserName(){
-        getUsername();
         return getUsername().stream().findFirst().toString();
     }
     public Optional<String> getRole() {

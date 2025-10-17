@@ -2,11 +2,14 @@ package com.example.userservice.config;
 
 import com.example.userservice.util.JwtUtil;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -19,9 +22,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, RedisTemplate<String, Object> redisTemplate) {
         this.jwtUtil = jwtUtil;
+        this.redisTemplate = redisTemplate;
     }
 
     @Override
@@ -45,6 +50,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         String token = extractToken(request);
+        String bannerKey = "banner_token::" + token;
+        if (redisTemplate.hasKey(bannerKey)) {
+            throw new AuthenticationException("Token has been revoked") {};
+        }
+
         if (token != null && jwtUtil.validateToken(token)) {
             try {
                 Claims claims = jwtUtil.extractClaims(token);
@@ -54,23 +64,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                userId, null, List.of(new SimpleGrantedAuthority(role))
+                                userId, token, List.of(new SimpleGrantedAuthority(role))
                         );
-
-                // Gắn username vào details nếu cần
                 authentication.setDetails(userName);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            } catch (ExpiredJwtException e) {
+                throw e;
             } catch (Exception e) {
-                e.printStackTrace();
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
+                throw new AuthenticationException("Invalid token: " + e.getMessage()) {};
             }
         } else {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
+            throw new AuthenticationException("Missing or invalid Authorization header") {};
         }
+
 
         filterChain.doFilter(request, response);
     }

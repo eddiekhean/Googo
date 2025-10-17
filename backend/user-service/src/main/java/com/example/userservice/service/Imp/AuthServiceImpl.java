@@ -29,6 +29,7 @@ import org.springframework.security.core.Authentication;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -43,7 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final MailEventProducer mailEventProducer;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
-
+    private final CurrentUserProvider currentUserProvider;
     @Override
     public AuthResponse login(LoginRequest request) {
         try {
@@ -55,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = jwtUtil.generateAccessToken(user);
             String refreshToken = jwtUtil.generateRefreshToken(user);
 
-            String key = "refresh_token::" + user.getId();
+            String key = "refresh_token::" + refreshToken;
             redisTemplate.opsForValue().set(key, refreshToken, Duration.ofDays(7));
 
             return new AuthResponse(accessToken, refreshToken, jwtUtil.getAccessExpiration());
@@ -102,10 +103,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void sendOtp() {
         String otp = OtpUtil.generateOtp(6);
-        CurrentUserProvider currentUserProvider = new CurrentUserProvider();
         String email = userRepository.getEmailByUsername(currentUserProvider.getStringUserName());
-        String key = "otp:" + currentUserProvider.getUserId();
-        redisTemplate.opsForValue().set(key, otp, 2, TimeUnit.MINUTES);
+        String userId = currentUserProvider.getUserId().toString();
+        // Tạo 1 map chứa thông tin OTP + userId
+
+        Map<String, String> otpData = Map.of(
+                "userId", userId,
+                "otp", otp
+        );
+
+        String key = "otp:" + userId;
+        if (redisTemplate.hasKey(key)) {
+            redisTemplate.delete(key);
+        }
+        redisTemplate.opsForHash().putAll(key, otpData);
+        redisTemplate.expire(key, 2, TimeUnit.MINUTES);
         // Tạo mail event
         MailEvent event = MailEvent.builder()
                 .type("OTP")
@@ -118,15 +130,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean verifyOtp(String otp) {
-        CurrentUserProvider currentUserProvider = new CurrentUserProvider();
-        String key = "otp:" + currentUserProvider.getUserId();
-        String cachedOtp = Objects.requireNonNull(redisTemplate.opsForValue().get(key)).toString();
+        String key = "otp:" + currentUserProvider.getUserId().toString();
+        Object storedOtp = redisTemplate.opsForHash().get(key, "otp");
 
-        if (cachedOtp == null) {
+        if (storedOtp == null) {
             throw new OtpExpiredException("OTP đã hết hạn hoặc không tồn tại");
         }
 
-        if (!cachedOtp.equals(otp)) {
+        if (!storedOtp.equals(otp)) {
             throw new InvalidOtpException("OTP không hợp lệ");
         }
         redisTemplate.delete(key);
@@ -162,5 +173,112 @@ public class AuthServiceImpl implements AuthService {
 
         return new AuthResponse(newAccessToken, newRefreshToken, jwtUtil.getAccessExpiration());
     }
+
+    @Override
+    public void logout(String token, String refreshToken) {
+        String key = "refresh_token::"+refreshToken;
+        Claims claims = jwtUtil.extractClaims(token);
+        Date expiration = claims.getExpiration();
+        long ttlMillis = expiration.getTime() - System.currentTimeMillis();
+        String bannerKey = "banner_token::" + token;
+        if (ttlMillis > 0) {
+            redisTemplate.opsForValue().set(
+                    bannerKey,
+                    token,
+                    ttlMillis,
+                    TimeUnit.MILLISECONDS
+            );
+        } else {
+            throw new IllegalStateException("Token đã hết hạn");
+        }
+        redisTemplate.delete(key);
+    }
+
+    @Override
+    public void forgotPasswordUserName(String identifier) {
+        User user = userRepository.getUsersByUsername(identifier).stream().findFirst().orElseThrow(()-> new UsernameNotFoundException("Không tìm thấy user với username: " + identifier));
+
+        String otp = OtpUtil.generateOtp(6);
+        Map<String, String> otpData = Map.of(
+                "userId", user.getId().toString(),
+                "otp", otp
+        );
+
+        String key = "otp:" + user.getId().toString();
+        if (redisTemplate.hasKey(key)) {
+            redisTemplate.delete(key);
+        }
+        redisTemplate.opsForHash().putAll(key, otpData);
+        redisTemplate.expire(key, 2, TimeUnit.MINUTES);
+        // Tạo mail event
+        MailEvent event = MailEvent.builder()
+                .type("OTP")
+                .to(user.getEmail())
+                .data(Map.of("otp", otp))
+                .build();
+
+        mailEventProducer.sendMailEvent(event);
+    }
+    @Override
+    public void forgotPasswordEmail(String identifier) {
+        User user = userRepository.getUsersByEmail(identifier).stream().findFirst().orElseThrow(()-> new UsernameNotFoundException("Không tìm thấy user với username: " + identifier));
+
+        String otp = OtpUtil.generateOtp(6);
+        Map<String, String> otpData = Map.of(
+                "userId", user.getId().toString(),
+                "otp", otp
+        );
+
+        String key = "otp:" + user.getId().toString();
+        if (redisTemplate.hasKey(key)) {
+            redisTemplate.delete(key);
+        }
+        redisTemplate.opsForHash().putAll(key, otpData);
+        redisTemplate.expire(key, 2, TimeUnit.MINUTES);
+        // Tạo mail event
+        MailEvent event = MailEvent.builder()
+                .type("OTP")
+                .to(user.getEmail())
+                .data(Map.of("otp", otp))
+                .build();
+
+        mailEventProducer.sendMailEvent(event);
+    }
+
+    @Override
+    public void resetPassword(String email, String otp, String newPassword) {
+        User user = userRepository.getUsersByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        String key = "otp:" + user.getId();
+        Object storedOtp = redisTemplate.opsForHash().get(key, "otp");
+
+        if (storedOtp == null) {
+            throw new OtpExpiredException("OTP expired or does not exist");
+        }
+        if (!storedOtp.equals(otp)) {
+            throw new InvalidOtpException("Invalid OTP");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        redisTemplate.delete(key); // cleanup OTP
+    }
+
+    @Override
+    public void changePassword(String oldPassword, String newPassword) {
+        String userId = currentUserProvider.getUserId().toString();
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BadCredentialsException("Old password does not match");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
 
 }

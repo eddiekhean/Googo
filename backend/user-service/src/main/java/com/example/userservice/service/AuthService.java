@@ -15,4 +15,14 @@ public interface AuthService {
     boolean verifyOtp(@Valid @RequestParam String otp);
 
     AuthResponse refreshToken(String refreshToken);
+
+    void logout(String string, String refreshToken);
+
+    void forgotPasswordUserName(String identifier);
+
+    void forgotPasswordEmail(String identifier);
+
+    void resetPassword(String email, String otp, String newPassword);
+
+    void changePassword(String oldPassword, String newPassword);
 }

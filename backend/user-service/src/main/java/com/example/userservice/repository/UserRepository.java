@@ -25,4 +25,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u.email FROM User u WHERE u.username = :username")
     String getEmailByUsername(String username);
 
+    Optional<User> getUsersByEmail(String identifier);
+
 }

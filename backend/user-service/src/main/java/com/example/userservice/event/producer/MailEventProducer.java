@@ -1,7 +1,6 @@
 package com.example.userservice.event.producer;
 
 import com.example.userservice.dto.MailEvent;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
