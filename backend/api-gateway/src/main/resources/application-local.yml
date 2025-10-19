@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: http://localhost:8081
+              predicates:
+                - Path=/api/v1/**
+              filters:
+                - StripPrefix=0
+jwt:
+  public-key-path: classpath:keys/jwt-rsa-public.pem
+  access-expiration: 3600000
+  refresh-expiration: 604800000
+logging:
+  level:
+    org.springframework.security: DEBUG
