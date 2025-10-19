@@ -1,24 +1,24 @@
 package com.example.userservice.controller;
 
 
+import com.example.userservice.dto.UserResponse;
+import com.example.userservice.service.ProfileService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
 
+    final private ProfileService profileService;
 
-    // ✅ Lấy thông tin cá nhân
     @GetMapping("/me")
-    ResponseEntity<?> getProfile() {
-        // TODO: get user info by access token
-        // - Extract userId from JWT
-        // - Query user profile from DB (User table)
-        // - Exclude password, tokens, and internal fields
-        // - Return as UserDto
-        return ResponseEntity.ok().build();
+    ResponseEntity<UserResponse> getProfile() {
+        UserResponse response = profileService.getUserProfile();
+        return ResponseEntity.ok(response);
     }
 
     // ✅ Cập nhật thông tin cá nhân

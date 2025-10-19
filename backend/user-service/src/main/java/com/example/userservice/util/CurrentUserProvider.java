@@ -7,7 +7,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
-import java.util.regex.Pattern;
+
 
 @Component
 public class CurrentUserProvider {

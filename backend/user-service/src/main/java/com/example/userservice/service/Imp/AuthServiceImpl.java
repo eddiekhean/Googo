@@ -70,7 +70,6 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-
     @Override
     public void register(RegisterRequest request) throws BadRequestException {
         try {
@@ -279,6 +278,5 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
-
 
 }

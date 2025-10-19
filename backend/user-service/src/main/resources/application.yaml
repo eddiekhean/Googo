@@ -1,70 +1,99 @@
 spring:
   application:
-    name: user-service
-  spring:
-    kafka:
-      bootstrap-servers: localhost:9092
-      producer:
-        key-serializer: org.apache.kafka.common.serialization.StringSerializer
-        value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    name: ${SPRING_APP_NAME:user-service}
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      connection-timeout: ${DB_CONN_TIMEOUT:30000}
+      max-lifetime: ${DB_MAX_LIFETIME:60000}
 
   jpa:
     hibernate:
-      ddl-auto: none
-    show-sql: true
+      ddl-auto: ${HIBERNATE_DDL_AUTO:none}
+    show-sql: ${SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
-
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      timeout: ${REDIS_TIMEOUT:60000}
   cache:
     type: redis
-  profiles:
-    active: local
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  application:
-    name: user-service
-
-  jpa:
-    hibernate:
-      ddl-auto: none
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   mail:
-    host: smtp.gmail.com
-    port: 587
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
-  cache:
-    type: redis
-  profiles:
-    active: local
-  endpoint:
-    health:
-          show-details: always
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: email, profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-name: Google
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  cloud:
+    discovery:
+      enabled: ${DISCOVERY_ENABLED:true}
+    loadbalancer:
+      enabled: ${LOADBALANCER_ENABLED:true}
+    config:
+      enabled: ${CONFIG_ENABLED:false}
 
 server:
-  port: 8081
+  port: ${PORT:8081}
+  ssl:
+    enabled: ${SSL_ENABLED:false}
 
-  endpoint:
-    health:
-      show-details: always
+jwt:
+  private-key-path: ${JWT_PRIVATE_KEY_PATH}
+  public-key-path: ${JWT_PUBLIC_KEY_PATH}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
+security:
+  internal:
+    secret: ${INTERNAL_PRIVATE_KEY}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}

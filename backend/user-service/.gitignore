@@ -40,7 +40,7 @@ config/*.local.yaml
 config/*.dev.yaml
 
 # =========================
-# Docker
+# Dockerfile
 # =========================
 /docker-compose.override.yml
 /.docker/

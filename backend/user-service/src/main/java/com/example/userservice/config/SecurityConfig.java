@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -21,7 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
-    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final InternalAuthFilter internalAuthFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -39,17 +40,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    public DefaultSecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable);
+                .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

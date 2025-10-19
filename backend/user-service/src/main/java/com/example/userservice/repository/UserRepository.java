@@ -1,5 +1,6 @@
 package com.example.userservice.repository;
 
+import com.example.userservice.dto.UserResponse;
 import com.example.userservice.model.entity.User;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -27,4 +28,27 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> getUsersByEmail(String identifier);
 
+    @Query("""
+      SELECT new com.example.userservice.dto.UserResponse(
+          u.username,
+          u.email,
+          u.fullName,
+          u.phone,
+          u.dateOfBirth,
+          u.avatarUrl,
+          u.createdAt,
+          u.updatedAt,
+          u.gender,
+          u.status,
+          a.street
+      )
+      FROM User u
+      LEFT JOIN Address a
+        ON a.user = u AND a.isDefault = true
+      WHERE u.id = :userId
+""")
+    Optional<UserResponse> findUserWithDefaultAddress(UUID userId);
+
+
+    Optional<User> getUsersById(UUID id);
 }
