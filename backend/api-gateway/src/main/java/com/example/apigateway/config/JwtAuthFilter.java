@@ -3,8 +3,11 @@ package com.example.apigateway.config;
 import com.example.apigateway.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -15,38 +18,46 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 
 @Component
-@RequiredArgsConstructor
-public class JwtGlobalFilter implements GlobalFilter {
+public class JwtAuthFilter implements GatewayFilter {
+
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/v1/auth",
+            "/swagger",
+            "/v3/api-docs",
+            "/actuator",
+            "/health"
+    );
 
     private final JwtUtil jwtUtil;
-    private final String internalSecret = "super_strong_internal_secret_key";
+    private final String internalSecret;
+
+    public JwtAuthFilter(JwtUtil jwtUtil, @Value("${security.internal.secret}") String internalSecret) {
+        this.jwtUtil = jwtUtil;
+        this.internalSecret = internalSecret;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        System.out.println(">>> [GATEWAY] Incoming request path: " + path);
+        System.out.println(">>> [GATEWAY] Incoming path: " + path);
 
-        // Bỏ qua public path
-        if (path.startsWith("/api/v1/auth") || path.startsWith("/swagger") || path.startsWith("/v3/api-docs")) {
-            System.out.println(">>> [GATEWAY] Public path detected, skipping JWT filter.");
+        if (isPublicPath(path)) {
+            System.out.println(">>> [GATEWAY] Public path detected, skipping JWT check.");
             return chain.filter(exchange);
         }
 
         String token = extractToken(request);
         if (token == null) {
-            System.out.println(">>> [GATEWAY] Missing Authorization header.");
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
-        System.out.println(">>> [GATEWAY] Token received: " + token.substring(0, Math.min(20, token.length())) + "...");
-
         if (!jwtUtil.validateToken(token)) {
-            System.out.println(">>> [GATEWAY] Invalid JWT token.");
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
@@ -58,10 +69,6 @@ public class JwtGlobalFilter implements GlobalFilter {
         String timestamp = String.valueOf(System.currentTimeMillis());
         String signature = hmacSha256(userId + ":" + role + ":" + timestamp, internalSecret);
 
-        System.out.println(">>> [GATEWAY] Authenticated user: " + userName + " (" + role + ")");
-        System.out.println(">>> [GATEWAY] Forwarding request with internal headers.");
-
-        // Build request mới có header nội bộ
         ServerHttpRequest mutated = request.mutate()
                 .header("X-User-Id", userId)
                 .header("X-Role", role)
@@ -73,12 +80,20 @@ public class JwtGlobalFilter implements GlobalFilter {
         return chain.filter(exchange.mutate().request(mutated).build());
     }
 
+    private boolean isPublicPath(String path) {
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+    }
+
     private String extractToken(ServerHttpRequest request) {
-        String auth = request.getHeaders().getFirst("Authorization");
-        if (auth != null && auth.startsWith("Bearer ")) {
-            return auth.substring(7);
+        List<String> authHeaders = request.getHeaders().get(HttpHeaders.AUTHORIZATION);
+        if (authHeaders == null || authHeaders.isEmpty()) {
+            return null;
         }
-        return null;
+        String bearer = authHeaders.get(0);
+        if (!bearer.startsWith("Bearer ")) {
+            return null;
+        }
+        return bearer.substring(7);
     }
 
     private String hmacSha256(String data, String secret) {
@@ -87,7 +102,7 @@ public class JwtGlobalFilter implements GlobalFilter {
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new RuntimeException("Error generating HMAC", e);
+            throw new RuntimeException("Failed to calculate HMAC", e);
         }
     }
 }

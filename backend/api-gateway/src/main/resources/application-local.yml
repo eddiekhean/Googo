@@ -13,6 +13,9 @@ spring:
                 - Path=/api/v1/**
               filters:
                 - StripPrefix=0
+  security:
+    internal:
+          secret: super_strong_internal_secret_key
 jwt:
   public-key-path: classpath:keys/jwt-rsa-public.pem
   access-expiration: 3600000
