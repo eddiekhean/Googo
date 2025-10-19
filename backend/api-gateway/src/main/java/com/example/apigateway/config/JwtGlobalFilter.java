@@ -4,7 +4,6 @@ import com.example.apigateway.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.http.HttpHeaders;
@@ -21,10 +20,14 @@ import java.util.Base64;
 import java.util.List;
 
 @Component
-public class JwtAuthFilter implements GatewayFilter {
+@RequiredArgsConstructor
+public class JwtGlobalFilter implements GlobalFilter {
 
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/v1/auth",
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/forget_password",
+            "/api/v1/auth/reset_password",
             "/swagger",
             "/v3/api-docs",
             "/actuator",
@@ -32,24 +35,18 @@ public class JwtAuthFilter implements GatewayFilter {
     );
 
     private final JwtUtil jwtUtil;
-    private final String internalSecret;
 
-    public JwtAuthFilter(JwtUtil jwtUtil, @Value("${security.internal.secret}") String internalSecret) {
-        this.jwtUtil = jwtUtil;
-        this.internalSecret = internalSecret;
-    }
+    @Value("${security.internal.secret}")
+    private String internalSecret;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        System.out.println(">>> [GATEWAY] Incoming path: " + path);
-
-        if (isPublicPath(path)) {
-            System.out.println(">>> [GATEWAY] Public path detected, skipping JWT check.");
+        if (isPublicPath(path))
             return chain.filter(exchange);
-        }
+
 
         String token = extractToken(request);
         if (token == null) {
@@ -69,6 +66,8 @@ public class JwtAuthFilter implements GatewayFilter {
         String timestamp = String.valueOf(System.currentTimeMillis());
         String signature = hmacSha256(userId + ":" + role + ":" + timestamp, internalSecret);
 
+
+
         ServerHttpRequest mutated = request.mutate()
                 .header("X-User-Id", userId)
                 .header("X-Role", role)
@@ -86,13 +85,11 @@ public class JwtAuthFilter implements GatewayFilter {
 
     private String extractToken(ServerHttpRequest request) {
         List<String> authHeaders = request.getHeaders().get(HttpHeaders.AUTHORIZATION);
-        if (authHeaders == null || authHeaders.isEmpty()) {
-            return null;
-        }
+        if (authHeaders == null || authHeaders.isEmpty()) return null;
+
         String bearer = authHeaders.get(0);
-        if (!bearer.startsWith("Bearer ")) {
-            return null;
-        }
+        if (!bearer.startsWith("Bearer ")) return null;
+
         return bearer.substring(7);
     }
 

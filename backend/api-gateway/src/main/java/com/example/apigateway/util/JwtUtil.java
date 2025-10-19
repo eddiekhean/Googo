@@ -1,7 +1,6 @@
 package com.example.apigateway.util;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -14,6 +13,7 @@ import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Date;
 
 
 @Component
@@ -56,10 +56,34 @@ public class JwtUtil {
 
     public boolean validateToken(String token) {
         try {
-            extractClaims(token);
+            Claims claims = extractClaims(token);
+
+            // kiểm tra hết hạn
+            Date expiration = claims.getExpiration();
+            if (expiration == null || expiration.before(new Date())) {
+                System.out.println(">>> [JWT] Token expired");
+                return false;
+            }
+
+            // có thể thêm logic khác như userId, role...
+            String subject = claims.getSubject();
+            if (subject == null || subject.isEmpty()) {
+                System.out.println(">>> [JWT] Missing subject in token");
+                return false;
+            }
+
             return true;
-        } catch (Exception e) {
-            return false;
+
+        } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
+            System.out.println(">>> [JWT] Invalid signature or malformed token");
+        } catch (ExpiredJwtException e) {
+            System.out.println(">>> [JWT] Token expired");
+        } catch (UnsupportedJwtException e) {
+            System.out.println(">>> [JWT] Unsupported JWT");
+        } catch (IllegalArgumentException e) {
+            System.out.println(">>> [JWT] Illegal token argument");
         }
+        return false;
     }
+
 }

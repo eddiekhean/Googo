@@ -6,6 +6,8 @@ spring:
     gateway:
       server:
         webflux:
+          default-filters:
+            - PreserveHostHeader
           routes:
             - id: user-service
               uri: http://localhost:8081
@@ -13,13 +15,22 @@ spring:
                 - Path=/api/v1/**
               filters:
                 - StripPrefix=0
-  security:
-    internal:
-          secret: super_strong_internal_secret_key
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins: "*"
+                allowed-methods: "*"
+                allowed-headers: "*"
+
+security:
+  internal:
+    secret: super_strong_internal_secret_key
+
 jwt:
   public-key-path: classpath:keys/jwt-rsa-public.pem
   access-expiration: 3600000
   refresh-expiration: 604800000
+
 logging:
   level:
     org.springframework.security: DEBUG

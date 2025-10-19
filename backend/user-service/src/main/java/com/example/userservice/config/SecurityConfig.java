@@ -16,10 +16,23 @@ import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/forget_password",
+            "/api/v1/auth/reset_password",
+            "/swagger",
+            "/v3/api-docs",
+            "/actuator",
+            "/health"
+    );
 
     private final UserDetailsService userDetailsService;
     private final InternalAuthFilter internalAuthFilter;
@@ -44,7 +57,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers(PUBLIC_PATHS.toArray(String[]::new)).permitAll()
                         .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -53,3 +66,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+

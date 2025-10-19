@@ -29,13 +29,6 @@ public class InternalAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
-        String path = request.getRequestURI();
-        if (path.startsWith("/api/v1/auth")
-                || path.startsWith("/swagger")
-                || path.startsWith("/v3/api-docs")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
 
         // Lấy header do Gateway chèn vào
         String userId = request.getHeader("X-User-Id");
