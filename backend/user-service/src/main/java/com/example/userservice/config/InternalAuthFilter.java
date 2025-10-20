@@ -35,6 +35,9 @@ public class InternalAuthFilter extends OncePerRequestFilter {
         String role = request.getHeader("X-Role");
         String timestamp = request.getHeader("X-Timestamp");
         String signature = request.getHeader("X-Internal-Signature");
+        System.out.println("➡️ User-service received headers:");
+        request.getHeaderNames().asIterator()
+                .forEachRemaining(h -> System.out.println(h + ": " + request.getHeader(h)));
 
         // Nếu thiếu header → từ chối ngay
         if (userId == null || role == null || timestamp == null || signature == null) {
@@ -78,4 +81,17 @@ public class InternalAuthFilter extends OncePerRequestFilter {
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
     }
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/v1/auth/register")
+                || path.startsWith("/api/v1/auth/login")
+                || path.startsWith("/api/v1/auth/forgot_password")
+                || path.startsWith( "/api/v1/auth/reset_password")
+                || path.startsWith("/swagger")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/actuator")
+                || path.startsWith("/health");
+    }
+
 }

@@ -63,6 +63,7 @@ public class JwtGlobalFilter implements GlobalFilter {
         String userId = claims.getSubject();
         String role = claims.get("role", String.class);
         String userName = claims.get("userName", String.class);
+
         String timestamp = String.valueOf(System.currentTimeMillis());
         String signature = hmacSha256(userId + ":" + role + ":" + timestamp, internalSecret);
 
@@ -75,6 +76,8 @@ public class JwtGlobalFilter implements GlobalFilter {
                 .header("X-Timestamp", timestamp)
                 .header("X-Internal-Signature", signature)
                 .build();
+        System.out.println("➡️ Gateway forwarding to service with headers:");
+        mutated.getHeaders().forEach((k, v) -> System.out.println(k + ": " + v));
 
         return chain.filter(exchange.mutate().request(mutated).build());
     }

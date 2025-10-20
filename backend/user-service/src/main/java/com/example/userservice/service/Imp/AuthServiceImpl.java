@@ -92,6 +92,11 @@ public class AuthServiceImpl implements AuthService {
             );
             user.setGender(Gender.OTHER);
             //TODO sending mail welcome
+            mailEventProducer.sendMailEvent(MailEvent.builder()
+                    .type("WELCOME")
+                    .to(request.getEmail())
+                    .data(Map.of("name", request.getFullName()))
+                    .build());
             userRepository.save(user);
         } catch (UserAlreadyExistsException e) {
             throw new BadRequestException("Duplicate user info");
